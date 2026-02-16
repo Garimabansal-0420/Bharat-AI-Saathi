@@ -1,46 +1,145 @@
-import json
-import os
+# import pandas as pd
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-file_path = os.path.join(BASE_DIR, "schemes.json")
+# try:
+#     df = pd.read_csv("updated_data.csv")
+#     df.columns = df.columns.str.strip()
+#     print("Dataset loaded ✅")
+# except Exception as e:
+#     print("Dataset error:", e)
+#     df = pd.DataFrame()
 
-def load_schemes():
-    with open(file_path, "r", encoding="utf-8") as f:
-        return json.load(f)
+# def recommend_schemes(user):
 
-def calculate_score(user, scheme):
-    score = 0
+#     if df.empty:
+#         return ["Dataset not loaded"]
 
-    age_min = scheme.get("age_min", 0)
-    age_max = scheme.get("age_max", 100)
+#     results = []
 
-    if age_min <= user["age"] <= age_max:
-        score += 20
+#     for _, row in df.iterrows():
 
-    if scheme.get("gender", "any") in ["any", user["gender"]]:
-        score += 15
+#         text = " ".join(row.fillna("").astype(str)).lower()
 
-    if user["income"] <= scheme.get("income_max", 9999999):
-        score += 25
+#         score = 0
+#         reasons = []
 
-    if scheme.get("state", "all") in ["all", user["state"]]:
-        score += 20
+#         # ⭐ STATE MATCH
+#         if user["state"].lower() in text:
+#             score += 30
+#             reasons.append("State match")
 
-    if scheme.get("category", "all") in ["all", user["category"]]:
-        score += 20
+#         # ⭐ CATEGORY MATCH
+#         if user["category"].lower() in text:
+#             score += 25
+#             reasons.append("Category eligible")
 
-    return score
+#         # ⭐ LOW INCOME SCHEMES
+#         if "scholarship" in text or "assistance" in text:
+#             if user["income"] < 300000:
+#                 score += 20
+#                 reasons.append("Low income eligible")
+
+#         # ⭐ WOMEN SCHEMES
+#         if "women" in text or "girl" in text:
+#             if user["gender"].lower() == "female":
+#                 score += 15
+#                 reasons.append("Women specific scheme")
+
+#         # ⭐ AGE-BASED SCHEMES
+#         if "student" in text or "youth" in text:
+#             if user["age"] <= 25:
+#                 score += 10
+#                 reasons.append("Youth eligible")
+
+#         # Only include if some eligibility matched
+#         if score > 0:
+#             results.append({
+#                 "scheme": row.iloc[0],
+#                 "match_score": score,
+#                 "reason": ", ".join(reasons)
+#             })
+
+#     if not results:
+#         return ["No matching schemes found"]
+
+#     # Sort by best match
+#     results = sorted(results, key=lambda x: x["match_score"], reverse=True)
+
+#     return results[:5]
+
+
+import pandas as pd
+
+try:
+    df = pd.read_csv("updated_data.csv")
+    df.columns = df.columns.str.strip()
+    print("Dataset loaded ✅")
+except Exception as e:
+    print("Dataset error:", e)
+    df = pd.DataFrame()
 
 def recommend_schemes(user):
-    schemes = load_schemes()
+
+    if df.empty:
+        return ["Dataset not loaded"]
+
     results = []
 
-    for scheme in schemes:
-        score = calculate_score(user, scheme)
+    for _, row in df.iterrows():
 
-        if score > 40:
-            scheme_copy = scheme.copy()
-            scheme_copy["eligibility_score"] = score
-            results.append(scheme_copy)
+        text = " ".join(row.fillna("").astype(str)).lower()
 
-    return sorted(results, key=lambda x: x["eligibility_score"], reverse=True)
+        score = 0
+        reasons = []
+
+        # ⭐ SCHEME LEVEL LOGIC
+        level = str(row.get("Level", "")).lower()
+
+        if level == "central":
+            score += 40
+            reasons.append("Central scheme (nationwide eligible)")
+
+        elif level == "state":
+            if user["state"].lower() in text:
+                score += 40
+                reasons.append("State scheme eligible")
+
+        elif level == "local":
+            if user["state"].lower() in text:
+                score += 30
+                reasons.append("Local scheme eligible")
+
+        # ⭐ CATEGORY MATCH
+        if user["category"].lower() in text:
+            score += 25
+            reasons.append("Category eligible")
+
+        # ⭐ LOW INCOME
+        if user["income"] < 300000 and ("scholarship" in text or "assistance" in text):
+            score += 20
+            reasons.append("Low income eligible")
+
+        # ⭐ WOMEN SCHEMES
+        if "women" in text or "girl" in text:
+            if user["gender"].lower() == "female":
+                score += 15
+                reasons.append("Women specific scheme")
+
+        # ⭐ AGE-BASED
+        if "student" in text or "youth" in text:
+            if user["age"] <= 25:
+                score += 10
+                reasons.append("Youth eligible")
+
+        if score > 0:
+            results.append({
+                "scheme": row.iloc[0],
+                "match_score": score,
+                "reason": ", ".join(reasons)
+            })
+
+    if not results:
+        return ["No matching schemes found"]
+
+    results = sorted(results, key=lambda x: x["match_score"], reverse=True)
+
+    return results[:5]
